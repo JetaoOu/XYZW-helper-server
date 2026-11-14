@@ -173,8 +173,15 @@ export async function pollWechatScan(uuid: string): Promise<WechatScanResult> {
     if (!code) return { status: "waiting", nickname };
     return { status: "confirmed", code, nickname };
   }
-  if (errcode === 403) return { status: "scanned", nickname };
-  if (errcode === 404) return { status: "expired", nickname };
+  // 403/404 在不同客户端版本里都表示「已扫码」；二维码是否过期交给前端倒计时判断，
+  // 避免扫码瞬间被 WeChat 回的 404 误判成过期。
+  if (errcode === 403 || errcode === 404) {
+    log.info(`微信轮询状态 ${errcode}：${text.slice(0, 160)}`);
+    return { status: "scanned", nickname };
+  }
+  log.info(
+    `微信轮询未知响应 errcode=${errcode}：${text.slice(0, 160)}`,
+  );
   return { status: "waiting", nickname };
 }
 

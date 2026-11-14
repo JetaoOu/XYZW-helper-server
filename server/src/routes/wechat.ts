@@ -18,7 +18,9 @@ export async function registerWechatRoutes(
     { preHandler: requireUser },
     async (_request, reply) => {
       try {
-        return await createWechatQr();
+        const qr = await createWechatQr();
+        log.info("已生成微信登录二维码");
+        return qr;
       } catch (error) {
         log.warn(`获取微信二维码失败：${(error as Error).message}`);
         return reply
@@ -37,7 +39,12 @@ export async function registerWechatRoutes(
         return reply.code(400).send({ error: "缺少 uuid" });
       }
       try {
-        return await pollWechatScan(uuid);
+        const result = await pollWechatScan(uuid);
+        // 只在状态变化时留痕，避免刷屏（不记录 code）
+        if (result.status !== "waiting") {
+          log.info(`微信扫码状态：${result.status}`);
+        }
+        return result;
       } catch (error) {
         return reply
           .code(502)
@@ -59,6 +66,7 @@ export async function registerWechatRoutes(
       try {
         return await completeWechatLogin(body.code, body.nickname ?? "");
       } catch (error) {
+        log.warn(`微信登录失败：${(error as Error).message}`);
         return reply
           .code(400)
           .send({ error: (error as Error).message || "微信登录失败" });

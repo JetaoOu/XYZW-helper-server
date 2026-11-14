@@ -169,7 +169,13 @@
             </div>
             <div v-else class="wx-qr-box">
               <img :src="wxQr.imageUrl" alt="微信登录二维码" class="wx-qr-image" />
-              <div class="wx-qr-status">{{ wxStatusText }}</div>
+              <n-button size="small" @click="fetchWxQr">刷新二维码</n-button>
+            </div>
+            <div v-if="wxStatusText" class="wx-qr-status">
+              {{ wxStatusText }}
+              <span v-if="wxQr && wxCountdown > 0" class="muted">
+                （剩余 {{ wxCountdown }} 秒）
+              </span>
             </div>
             <n-alert v-if="wxError" type="error" :bordered="false">
               {{ wxError }}
@@ -799,8 +805,10 @@ const wxError = ref("");
 const wxRoles = ref<WechatRole[]>([]);
 const wxSelected = ref<string[]>([]);
 const wxSessionId = ref("");
+const wxCountdown = ref(0);
 /** 轮询代次：重新获取二维码或关闭弹窗时 +1，让旧循环退出 */
 let wxPollToken = 0;
+let wxCountdownTimer: ReturnType<typeof setInterval> | null = null;
 const manualForm = reactive({ name: "", server: "", token: "" });
 const urlForm = reactive({ name: "", url: "" });
 const binForm = reactive({
@@ -1916,8 +1924,29 @@ function stopWxPolling(): void {
   wxPollToken += 1;
 }
 
+function stopWxCountdown(): void {
+  if (wxCountdownTimer) clearInterval(wxCountdownTimer);
+  wxCountdownTimer = null;
+  wxCountdown.value = 0;
+}
+
+/** 二维码有效期约 2 分钟，本地倒计时到点就提示重新获取 */
+function startWxCountdown(): void {
+  stopWxCountdown();
+  wxCountdown.value = 120;
+  wxCountdownTimer = setInterval(() => {
+    wxCountdown.value = Math.max(0, wxCountdown.value - 1);
+    if (wxCountdown.value === 0) {
+      stopWxCountdown();
+      wxQr.value = null;
+      wxStatusText.value = "二维码已过期，请重新获取";
+    }
+  }, 1000);
+}
+
 function resetWx(): void {
   stopWxPolling();
+  stopWxCountdown();
   wxQr.value = null;
   wxStatusText.value = "";
   wxError.value = "";
@@ -1933,6 +1962,7 @@ async function fetchWxQr(): Promise<void> {
     const qr = await api.post<WechatQr>("/api/wx/qrcode");
     wxQr.value = qr;
     wxStatusText.value = "等待扫码…";
+    startWxCountdown();
     void pollWxScan(qr.uuid, ++wxPollToken);
   } catch (error) {
     wxError.value = (error as Error).message;
@@ -1956,6 +1986,7 @@ async function pollWxScan(uuid: string, token: number): Promise<void> {
     if (token !== wxPollToken) return;
 
     if (result.status === "expired") {
+      stopWxCountdown();
       wxQr.value = null;
       wxStatusText.value = "二维码已过期，请重新获取";
       return;
@@ -1963,6 +1994,7 @@ async function pollWxScan(uuid: string, token: number): Promise<void> {
     if (result.status === "scanned") {
       wxStatusText.value = "已扫码，请在微信中确认";
     } else if (result.status === "confirmed" && result.code) {
+      stopWxCountdown();
       wxStatusText.value = "已确认，正在登录…";
       try {
         const session = await api.post<WechatSessionView>(
