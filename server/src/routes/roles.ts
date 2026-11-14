@@ -63,7 +63,23 @@ export async function registerRoleRoutes(app: FastifyInstance): Promise<void> {
     async (request) => {
       const ownerId = request.user!.id;
       const list = listRoles(ownerId);
-      return { roles: list.map(toRoleView) };
+      // 列表不带完整快照，详情由 GET /api/roles/:id 单独读取
+      return {
+        roles: list.map((role) => toRoleView(role, { includeSnapshot: false })),
+      };
+    },
+  );
+
+  // 角色详情（含完整快照）
+  app.get<{ Params: { id: string } }>(
+    "/api/roles/:id",
+    { preHandler: requireUser },
+    async (request, reply) => {
+      const role = getRole(request.user!.id, request.params.id);
+      if (!role) {
+        return reply.code(404).send({ error: "角色不存在" });
+      }
+      return { role: toRoleView(role) };
     },
   );
 

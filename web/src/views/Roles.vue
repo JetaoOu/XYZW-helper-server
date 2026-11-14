@@ -1180,13 +1180,31 @@ async function load(): Promise<void> {
       roles.value.some((role) => role.id === key),
     );
     if (detailRole.value) {
-      detailRole.value =
-        roles.value.find((item) => item.id === detailRole.value?.id) ?? null;
+      const openId = detailRole.value.id;
+      if (roles.value.some((item) => item.id === openId)) {
+        void loadRoleDetail(openId);
+      } else {
+        detailRole.value = null;
+      }
     }
   } catch (error) {
     message.error((error as Error).message);
   } finally {
     loading.value = false;
+  }
+}
+
+/** 列表接口不返回完整快照，打开详情时单独拉一次 */
+async function loadRoleDetail(roleId: string): Promise<void> {
+  try {
+    const result = await api.get<{ role: RoleView | null }>(
+      `/api/roles/${roleId}`,
+    );
+    if (result.role && detailRole.value?.id === roleId) {
+      detailRole.value = result.role;
+    }
+  } catch {
+    // 详情拉取失败不阻塞抽屉，列表数据仍可用
   }
 }
 
@@ -1204,6 +1222,7 @@ function openDetail(role: RoleView): void {
   growthDays.value = [];
   growthDate.value = days.value[0].date;
   showDetail.value = true;
+  void loadRoleDetail(role.id);
   void loadActionStatus(role.id);
   void loadDailyStatus(role.id);
   void loadGrowth(role.id);

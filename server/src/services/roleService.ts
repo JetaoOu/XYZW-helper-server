@@ -187,7 +187,10 @@ export function deleteRole(ownerId: string, roleId: string): void {
 }
 
 /** 对外返回的角色视图：不含凭据，只含摘要与快照 */
-export function toRoleView(role: NonNullable<ReturnType<typeof getRole>>) {
+export function toRoleView(
+  role: NonNullable<ReturnType<typeof getRole>>,
+  options: { includeSnapshot?: boolean } = {},
+) {
   let credentialSummary: Record<string, unknown> | null = null;
   try {
     const parsed = JSON.parse(role.credential) as Record<string, unknown>;
@@ -201,8 +204,9 @@ export function toRoleView(role: NonNullable<ReturnType<typeof getRole>>) {
     credentialSummary = null;
   }
 
+  // 列表接口不带完整快照：单份快照可达上百 KB，会显著拖慢响应
   let snapshot: unknown = null;
-  if (role.lastSnapshotJson) {
+  if (options.includeSnapshot !== false && role.lastSnapshotJson) {
     try {
       snapshot = JSON.parse(role.lastSnapshotJson);
     } catch {
