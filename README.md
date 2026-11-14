@@ -31,6 +31,14 @@ docker compose up -d --build
 
 访问 `http://<服务器IP>:3000/`。
 
+国内服务器如果拉不到 Docker Hub 的 `node:22-bookworm-slim`，可以在构建时指定镜像站：
+
+```bash
+NODE_IMAGE=docker.m.daocloud.io/library/node:22-bookworm-slim docker compose up -d --build
+```
+
+也可以把 `NODE_IMAGE` 写进 `.env`，后续构建自动生效。
+
 > 当前部署不走 HTTPS，登录凭据与游戏凭据会在公网明文传输。请使用高强度随机密码，并在条件允许时尽快在反向代理层补上 TLS。
 
 ## 阶段

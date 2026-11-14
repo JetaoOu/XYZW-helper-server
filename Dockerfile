@@ -1,5 +1,8 @@
+# 基础镜像地址，可通过 build-arg 覆盖（例如国内网络用镜像站）
+ARG NODE_IMAGE=node:22-bookworm-slim
+
 # 构建阶段：安装依赖、构建前后端
-FROM node:22-bookworm-slim AS build
+FROM ${NODE_IMAGE} AS build
 WORKDIR /app
 RUN corepack enable
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
@@ -10,7 +13,7 @@ COPY . .
 RUN pnpm --filter web build && pnpm --filter server build
 
 # 运行阶段：只保留生产依赖与构建产物
-FROM node:22-bookworm-slim AS runtime
+FROM ${NODE_IMAGE} AS runtime
 WORKDIR /app
 RUN corepack enable
 ENV NODE_ENV=production
