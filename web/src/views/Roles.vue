@@ -158,6 +158,60 @@
           </div>
         </n-tab-pane>
 
+        <n-tab-pane name="wx" tab="微信扫码">
+          <n-space vertical>
+            <n-alert type="info" :bordered="false">
+              用微信扫码后，会列出该微信号下的所有角色，勾选即可批量导入。
+              二维码约 2 分钟有效。
+            </n-alert>
+            <div v-if="!wxQr" class="wx-qr-placeholder" @click="fetchWxQr">
+              点击获取微信登录二维码
+            </div>
+            <div v-else class="wx-qr-box">
+              <img :src="wxQr.imageUrl" alt="微信登录二维码" class="wx-qr-image" />
+              <div class="wx-qr-status">{{ wxStatusText }}</div>
+            </div>
+            <n-alert v-if="wxError" type="error" :bordered="false">
+              {{ wxError }}
+            </n-alert>
+            <n-space v-if="wxRoles.length" vertical>
+              <div class="muted">
+                共 {{ wxRoles.length }} 个角色，已选 {{ wxSelected.length }} 个
+              </div>
+              <n-checkbox-group v-model:value="wxSelected">
+                <n-space vertical>
+                  <n-checkbox
+                    v-for="role in wxRoles"
+                    :key="role.serverId"
+                    :value="role.serverId"
+                  >
+                    {{ role.name }}
+                    <span class="muted">
+                      · {{ role.serverName || role.serverId + "服" }}
+                      <template v-if="role.power"> · 战力 {{ role.power }}</template>
+                    </span>
+                  </n-checkbox>
+                </n-space>
+              </n-checkbox-group>
+            </n-space>
+          </n-space>
+          <div class="form-actions">
+            <n-button @click="showAdd = false">关闭</n-button>
+            <n-button v-if="!wxQr" type="primary" :loading="wxLoading" @click="fetchWxQr">
+              获取二维码
+            </n-button>
+            <n-button
+              v-else
+              type="primary"
+              :loading="submitting"
+              :disabled="!wxSessionId || wxSelected.length === 0"
+              @click="importWxSelected"
+            >
+              导入选中（{{ wxSelected.length }}）
+            </n-button>
+          </div>
+        </n-tab-pane>
+
         <n-tab-pane name="backup" tab="旧备份">
           <n-space vertical>
             <p class="muted">
@@ -663,6 +717,8 @@ import {
   NAlert,
   NButton,
   NCard,
+  NCheckbox,
+  NCheckboxGroup,
   NColorPicker,
   NDataTable,
   NDescriptions,
@@ -697,6 +753,10 @@ import {
   type GrowthDay,
   type RoleLogGroup,
   type RoleView,
+  type WechatQr,
+  type WechatRole,
+  type WechatScanResult,
+  type WechatSessionView,
 } from "../api";
 import {
   HERO_DICT,
@@ -730,6 +790,17 @@ const groupDrafts = reactive<
 
 const showAdd = ref(false);
 const addTab = ref("manual");
+
+// 微信扫码导入
+const wxQr = ref<WechatQr | null>(null);
+const wxLoading = ref(false);
+const wxStatusText = ref("");
+const wxError = ref("");
+const wxRoles = ref<WechatRole[]>([]);
+const wxSelected = ref<string[]>([]);
+const wxSessionId = ref("");
+/** 轮询代次：重新获取二维码或关闭弹窗时 +1，让旧循环退出 */
+let wxPollToken = 0;
 const manualForm = reactive({ name: "", server: "", token: "" });
 const urlForm = reactive({ name: "", url: "" });
 const binForm = reactive({
@@ -1841,6 +1912,113 @@ async function updateRoleGroup(value: string | null): Promise<void> {
 
 
 
+function stopWxPolling(): void {
+  wxPollToken += 1;
+}
+
+function resetWx(): void {
+  stopWxPolling();
+  wxQr.value = null;
+  wxStatusText.value = "";
+  wxError.value = "";
+  wxRoles.value = [];
+  wxSelected.value = [];
+  wxSessionId.value = "";
+}
+
+async function fetchWxQr(): Promise<void> {
+  resetWx();
+  wxLoading.value = true;
+  try {
+    const qr = await api.post<WechatQr>("/api/wx/qrcode");
+    wxQr.value = qr;
+    wxStatusText.value = "等待扫码…";
+    void pollWxScan(qr.uuid, ++wxPollToken);
+  } catch (error) {
+    wxError.value = (error as Error).message;
+  } finally {
+    wxLoading.value = false;
+  }
+}
+
+/** 顺序轮询：服务端长轮询约 15 秒返回一次，不要用 setInterval 叠请求 */
+async function pollWxScan(uuid: string, token: number): Promise<void> {
+  while (token === wxPollToken && wxQr.value?.uuid === uuid) {
+    let result: WechatScanResult;
+    try {
+      result = await api.get<WechatScanResult>(
+        `/api/wx/status?uuid=${encodeURIComponent(uuid)}`,
+      );
+    } catch (error) {
+      wxError.value = (error as Error).message;
+      return;
+    }
+    if (token !== wxPollToken) return;
+
+    if (result.status === "expired") {
+      wxQr.value = null;
+      wxStatusText.value = "二维码已过期，请重新获取";
+      return;
+    }
+    if (result.status === "scanned") {
+      wxStatusText.value = "已扫码，请在微信中确认";
+    } else if (result.status === "confirmed" && result.code) {
+      wxStatusText.value = "已确认，正在登录…";
+      try {
+        const session = await api.post<WechatSessionView>(
+          "/api/wx/complete",
+          { code: result.code, nickname: result.nickname },
+        );
+        wxSessionId.value = session.sessionId;
+        wxRoles.value = session.roles;
+        wxSelected.value = session.roles.map((role) => role.serverId);
+        wxStatusText.value = session.nickname
+          ? `登录成功：${session.nickname}`
+          : "登录成功，请勾选要导入的角色";
+      } catch (error) {
+        wxError.value = (error as Error).message;
+      }
+      return;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 400));
+  }
+}
+
+async function importWxSelected(): Promise<void> {
+  if (!wxSessionId.value || wxSelected.value.length === 0) return;
+  submitting.value = true;
+  try {
+    const selected = wxRoles.value.filter((role) =>
+      wxSelected.value.includes(role.serverId),
+    );
+    const result = await api.post<{
+      created: number;
+      updated: number;
+      failed: number;
+    }>("/api/wx/import", {
+      sessionId: wxSessionId.value,
+      roles: selected.map((role) => ({
+        serverId: role.serverId,
+        roleId: role.roleId,
+        name: role.name,
+      })),
+    });
+    message.success(
+      `导入完成：新增 ${result.created}，更新 ${result.updated}，失败 ${result.failed}`,
+    );
+    await load();
+    showAdd.value = false;
+  } catch (error) {
+    message.error((error as Error).message);
+  } finally {
+    submitting.value = false;
+  }
+}
+
+watch(showAdd, (open) => {
+  if (!open) resetWx();
+});
+
 onMounted(load);
 </script>
 
@@ -2359,5 +2537,34 @@ onMounted(load);
 
 .group-row:last-of-type {
   border-bottom: none;
+}
+.wx-qr-placeholder {
+  border: 1px dashed #cbd5e1;
+  border-radius: 12px;
+  padding: 40px;
+  text-align: center;
+  color: #64748b;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.wx-qr-placeholder:hover {
+  border-color: #1677ff;
+  color: #1677ff;
+}
+.wx-qr-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+.wx-qr-image {
+  width: 220px;
+  height: 220px;
+  border-radius: 12px;
+  background: #fff;
+}
+.wx-qr-status {
+  color: #64748b;
+  font-size: 13px;
 }
 </style>

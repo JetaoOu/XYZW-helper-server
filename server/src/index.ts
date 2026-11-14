@@ -19,6 +19,7 @@ import { registerScheduleRoutes } from "./routes/schedules.js";
 import { registerRunRoutes } from "./routes/runs.js";
 import { registerSettingsRoutes } from "./routes/settings.js";
 import { registerMetaRoutes } from "./routes/meta.js";
+import { registerWechatRoutes } from "./routes/wechat.js";
 import { reloadSchedules } from "./services/scheduler.js";
 import { runBackup } from "./services/backup.js";
 import { runCleanup } from "./services/cleanup.js";
@@ -84,6 +85,7 @@ async function main(): Promise<void> {
   await registerRunRoutes(app);
   await registerSettingsRoutes(app);
   await registerMetaRoutes(app);
+  await registerWechatRoutes(app);
 
   // 生产模式下由后端托管前端静态文件
   const hasWebDist = fs.existsSync(path.join(config.webDist, "index.html"));

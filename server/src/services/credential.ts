@@ -41,6 +41,11 @@ function toArrayBuffer(data: ArrayBuffer | Uint8Array): ArrayBuffer {
   ) as ArrayBuffer;
 }
 
+/** 供其它登录链路（如 hortor comb-login）复用同一套登录限流 */
+export function scheduleLoginRequest<T>(fn: () => Promise<T>): Promise<T> {
+  return loginLimiter.schedule(fn);
+}
+
 async function postBinary(url: string, seq: number, body: ArrayBuffer) {
   const response = await fetch(`${url}?_seq=${seq}`, {
     method: "POST",
@@ -89,7 +94,8 @@ export function deriveServerLabel(
 
 export interface RoleBinPayload {
   [key: string]: unknown;
-  serverId?: number;
+  /** 账号级 BIN 为 null，角色级 BIN 为具体区服 */
+  serverId?: number | null;
 }
 
 /** 解析 BIN 文件中的登录信封 */
@@ -102,6 +108,12 @@ export function getBinPayload(data: ArrayBuffer): RoleBinPayload {
     throw new Error("BIN 登录凭据解析为空");
   }
   return payload as RoleBinPayload;
+}
+
+/** 直接编码 BIN payload（不改写 serverId），用于微信扫码后的账号级 BIN */
+export function encodeBin(payload: RoleBinPayload): ArrayBuffer {
+  const encoded = g_utils.encode(payload, "lx") as ArrayBuffer | Uint8Array;
+  return toArrayBuffer(encoded);
 }
 
 /** 按区服重新打包 BIN（游戏客户端使用的 LZ4 格式） */

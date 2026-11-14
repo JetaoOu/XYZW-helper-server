@@ -11,7 +11,7 @@
     "build": "tsc -p tsconfig.json",
     "start": "node dist/index.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "node --import tsx --test test/protocol.test.ts test/credentialCipher.test.ts test/credential.test.ts test/dailyConfig.test.ts test/cron.test.ts test/errorClassification.test.ts test/actions.test.ts"
+    "test": "node --import tsx --test test/protocol.test.ts test/credentialCipher.test.ts test/credential.test.ts test/dailyConfig.test.ts test/cron.test.ts test/errorClassification.test.ts test/actions.test.ts test/wechatPayload.test.ts"
   },
   "dependencies": {
     "@fastify/cookie": "^11.0.2",

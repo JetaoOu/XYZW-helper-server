@@ -220,3 +220,31 @@ export function formatTime(iso: string | null | undefined): string {
   if (Number.isNaN(date.getTime())) return "—";
   return date.toLocaleString("zh-CN", { hour12: false });
 }
+
+export interface WechatQr {
+  uuid: string;
+  imageUrl: string;
+}
+
+export type WechatScanStatus = "waiting" | "scanned" | "confirmed" | "expired";
+
+export interface WechatScanResult {
+  status: WechatScanStatus;
+  code?: string;
+  nickname?: string;
+}
+
+export interface WechatRole {
+  serverId: string;
+  roleId: string | null;
+  name: string;
+  power: number | null;
+  levelId: number | null;
+  serverName: string | null;
+}
+
+export interface WechatSessionView {
+  sessionId: string;
+  nickname: string;
+  roles: WechatRole[];
+}
