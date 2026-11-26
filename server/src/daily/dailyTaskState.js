@@ -157,24 +157,28 @@ export async function fillHangUpTime({
  * @param {Function} [fetchConfig] Fetch implementation for the official CDN.
  * @returns {Promise<object>} Validated task definitions and point-reward thresholds.
  */
+const CDN_BASE = "https://xxz-xyzw-res.hortorgames.com";
+
 export async function loadDailyTaskConfig(
   tokenStore,
   tokenId,
   fetchConfig = globalThis.fetch,
 ) {
-  const response = await tokenStore.sendMessageWithPromise(
-    tokenId,
-    "system_getdatabundlever",
-    {},
-    15000,
-  );
-  const version = response?.dataBundleVer;
-  if (typeof version !== "string" || !/^[\w-]+$/.test(version))
-    throw new Error("服务器未提供有效的任务配置版本");
+  // 官方配置版本从 CDN 的 data/version.json 读取：
+  // 不依赖 WS 连接，也避免 dataBundleVer 与配置版本不一致时拼错路径
+  // （实测当前两者都是 da6870e190，等价）。
+  const verResp = await fetchConfig(`${CDN_BASE}/data/version.json`, {
+    signal: AbortSignal.timeout(15000),
+  });
+  if (!verResp.ok) throw new Error("官方任务版本信息读取失败");
+  const verJson = await verResp.json();
+  const version = verJson?.version;
+  if (typeof version !== "string" || !/^[A-Za-z0-9_-]+$/.test(version))
+    throw new Error("CDN 未提供有效的任务配置版本");
   if (!configsByVersion.has(version)) {
     const loading = (async () => {
       const response = await fetchConfig(
-        `https://xxz-xyzw-res.hortorgames.com/data/${version}/config.json`,
+        `${CDN_BASE}/data/${version}/config.json`,
         { signal: AbortSignal.timeout(30000) },
       );
       if (!response.ok) throw new Error("官方任务配置读取失败");

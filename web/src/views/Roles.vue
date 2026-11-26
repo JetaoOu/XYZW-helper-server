@@ -1046,7 +1046,7 @@ const ACTION_ICONS: Record<string, string> = {
   legionStoreBuy: "🛒",
 };
 
-const ACTION_GROUP_ORDER = ["日常", "副本", "宝库", "怪异塔", "资源", "功法"];
+const ACTION_GROUP_ORDER = ["日常", "副本", "怪异塔", "资源", "功法"];
 
 const actionGroups = computed(() => {
   const categories = [

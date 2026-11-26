@@ -409,13 +409,19 @@ async function sendWithRetry(
   params: Record<string, unknown>,
   timeoutMs: number,
 ): Promise<unknown> {
-  try {
-    return await client.sendWithPromise(cmd, params, timeoutMs);
-  } catch (error) {
-    if (!isRetryable(error)) throw error;
-    await sleep(800);
-    return client.sendWithPromise(cmd, params, timeoutMs);
+  const maxAttempts = 3;
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      return await client.sendWithPromise(cmd, params, timeoutMs);
+    } catch (error) {
+      lastError = error;
+      if (!isRetryable(error) || attempt === maxAttempts) throw error;
+      // 瞬时错误（操作太快、服务器临时错误）退避后重试
+      await sleep(800 * attempt);
+    }
   }
+  throw lastError;
 }
 
 async function runAction(

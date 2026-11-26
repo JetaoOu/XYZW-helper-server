@@ -365,8 +365,6 @@ export const ACTION_ORDER = [
   "arena",
   "arena3",
   "weirdTower",
-  "bosstower13",
-  "bosstower45",
   "dream",
   "campTasks",
   "openBox",

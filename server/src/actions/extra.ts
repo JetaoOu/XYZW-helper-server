@@ -280,52 +280,6 @@ const arena3: ActionDefinition = {
   },
 };
 
-const bosstower13: ActionDefinition = {
-  key: "bosstower13",
-  name: "宝库前3层",
-  description: "咸王宝库 1-3 层：2 次 BOSS 战斗 + 9 次开箱",
-  category: "宝库",
-  async run(ctx) {
-    const info = (await ctx.send("bosstower_getinfo", {}, 8000)) as {
-      bossTower?: { towerId?: number };
-    };
-    const towerId = Number(info?.bossTower?.towerId ?? 0);
-    if (towerId < 1 || towerId > 3) {
-      return { status: "skipped", message: `当前宝库层数 ${towerId}，不在 1-3 层` };
-    }
-    for (let i = 0; i < 2; i++) {
-      await ctx.send("bosstower_startboss", {}, 8000);
-      await ctx.sleep(500);
-    }
-    for (let i = 0; i < 9; i++) {
-      await ctx.send("bosstower_startbox", {}, 8000);
-      await ctx.sleep(500);
-    }
-    return { status: "success", message: "宝库 1-3 层战斗完成" };
-  },
-};
-
-const bosstower45: ActionDefinition = {
-  key: "bosstower45",
-  name: "宝库4,5层",
-  description: "咸王宝库 4-5 层：2 次 BOSS 战斗",
-  category: "宝库",
-  async run(ctx) {
-    const info = (await ctx.send("bosstower_getinfo", {}, 8000)) as {
-      bossTower?: { towerId?: number };
-    };
-    const towerId = Number(info?.bossTower?.towerId ?? 0);
-    if (towerId < 4 || towerId > 5) {
-      return { status: "skipped", message: `当前宝库层数 ${towerId}，不在 4-5 层` };
-    }
-    for (let i = 0; i < 2; i++) {
-      await ctx.send("bosstower_startboss", {}, 8000);
-      await ctx.sleep(500);
-    }
-    return { status: "success", message: "宝库 4-5 层战斗完成" };
-  },
-};
-
 const dream: ActionDefinition = {
   key: "dream",
   name: "咸王梦境",
@@ -496,8 +450,6 @@ export const EXTRA_ACTIONS: Record<string, ActionDefinition> = {
   freeEnergy,
   legionStoreBuy,
   arena3,
-  bosstower13,
-  bosstower45,
   dream,
   campTasks,
   weirdTower,

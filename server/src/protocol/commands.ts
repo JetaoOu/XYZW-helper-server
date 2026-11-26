@@ -42,6 +42,7 @@ export const ERROR_CODE_MAP: Record<number, string> = {
   400070: "未到进阶等级，不能进阶",
   400090: "咸将等级不能大于主公等级",
   400130: "咸将等阶不能大于主公等阶",
+  200350: "服务器临时错误（可重试）",
 };
 
 /**
@@ -90,6 +91,7 @@ export const UNAVAILABLE_CODES = new Set([
 export const RETRYABLE_CODES = new Set([
   200400, // 操作太快
   12400000, // 领取过于频繁
+  200350, // 服务器临时错误（偶发，重试即可）
 ]);
 
 export type ErrorKind = "skip" | "unavailable" | "retry" | "fail";
